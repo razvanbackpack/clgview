@@ -32,7 +32,7 @@ class ClgParser{
         $headerData = ['type' => 'header', 'level' => 0, 'text' => ''];
 
         $headerData['level'] = strspn($line, '#');
-        $headerData['text'] = trim(substr(ltrim($line), $headerData['level']));
+        $headerData['text'] = htmlspecialchars(trim(substr(ltrim($line), $headerData['level'])));
 
         $this->items[] = $headerData;
         $this->currentHeader = $headerData;
@@ -52,7 +52,7 @@ class ClgParser{
 
         $itemData['level'] = strlen($item[1]);  // number of spaces
         $itemData['marker'] = $this->currentHeader['text'];           // -, *, or 1.
-        $itemData['text'] = $item[3];          // actual text
+        $itemData['text'] = htmlspecialchars($item[3]);          // actual text
 
         $this->items[] = $itemData;
     }
