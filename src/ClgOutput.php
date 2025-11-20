@@ -5,43 +5,162 @@ class ClgOutput {
     private array $items = [];
     private array $options = [
         'tab' => '&nbsp;&nbsp;&nbsp;',
+        'subtitles_as_labels' => true,
+        'item_ids' => [
+            'title' => 'title_id',
+            'subtitle' => 'subtitle_id',
+            'marker' => 'marker_id',
+            'list_container' => 'container_id',
+            'list_item' => 'item_id',
+        ],
+        'item_classes' => [
+            'title' => 'title_class',
+            'subtitle' => 'subtitle_class',
+            'marker' => 'marker_class',
+            'list_container' => 'container_class',
+            'list_item' => 'item_class',
+        ],
     ];
 
     /**
      * @param $parsedItems array
      */
-    public function __construct(array $parsedItems)
+    public function __construct(array $parsedItems, array $options)
     {
         $this->items = $parsedItems;
+        if ($this->validateOptions($options))
+            $this->options = $options;
+    }
+
+    /**
+     * @param $options array
+     */
+    private function validateOptions(array $options): bool {
+        $missing_fields = [];
+        $required_fields = ['tab', 'subtitles_as_labels', 'item_ids', 'item_classes'];
+
+        foreach ($required_fields as $field) {
+            if (!isset($options[$field])) {
+                $missing_fields[] = $field;
+            }
+        }
+
+        if (!empty($missing_fields)) {
+            throw new \InvalidArgumentException(
+                'Missing required options: ' . implode(', ', $missing_fields)
+            );
+        }
+
+        if (isset($options['item_ids'])) {
+            $required_ids = ['title', 'subtitle', 'marker', 'list_container', 'list_item'];
+            foreach ($required_ids as $id) {
+                if (!isset($options['item_ids'][$id])) {
+                    $missing_fields[] = "item_ids[$id]";
+                }
+            }
+        }
+
+        if (isset($options['item_classes'])) {
+            $required_classes = ['title', 'subtitle', 'marker', 'list_container', 'list_item'];
+            foreach ($required_classes as $class) {
+                if (!isset($options['item_classes'][$class])) {
+                    $missing_fields[] = "item_classes[$class]";
+                }
+            }
+        }
+
+        if (!empty($missing_fields)) {
+            throw new \InvalidArgumentException(
+                'Missing required options: ' . implode(', ', $missing_fields)
+            );
+        }
+
+        return true;
     }
 
     public function output(): void {
 
+        $in_list = false;
+        $title_count = 0;
+        $list_count = 0;
         foreach($this->items as $item)
         {
-            if($item['type'] == 'header')
-            {
-
-                if($item['level'] == 1) {
-                    echo sprintf('%s%s%s', '<h2>', $item['text'], '</h2>');
-                }
+            switch($item['type']) {
+                case 'header':
+                    $this->endListIfInList($in_list);
+                    $this->handleTitleItem($item, $title_count);
+                    break;
+                case 'list':
+                    $this->handleListItem($in_list, $item, $list_count);
+                    break;
+                default:
+                    $this->endListIfInList($in_list);
+                    break;
             }
+        }
 
-            if ($item['type'] == 'list') {
-                echo '<div style="display:flex;">';
-                echo sprintf('%s%s%s',
-                            '<div style="flex: 0.5">',
-                            $item['level'] == 0 ? $item['marker'] : '',
-                            '</div>');
+        $this->endListIfInList($in_list);
+    }
 
-                echo sprintf('%s%s%s%s',
-                            '<div style="flex: 2">',
-                            str_repeat($this->options['tab'], $item['level']),
-                            $item['text'],
-                            '</div>');
+    /**
+     * @param $in_list bool
+     */
+    private function endListIfInList(&$in_list = false): void
+    {
+        if ($in_list) // out of list items, end list container
+            echo '</div>';
+        $in_list = false;
+    }
+
+    /**
+     * @param $in_list bool
+     * @param $item array
+     */
+    private function handleListItem(&$in_list, $item, &$loop_count): void
+    {
+        if (!$in_list) // output list container
+            '<div id ="' . $this->options['item_ids']['list_container'] . $loop_count . '" class="' . $this->options['item_classes']['list_container'] . '">';
+
+        $in_list = true;
+
+        echo '<div style="display:flex">'; // per-item container
+            if ($this->options['subtitles_as_labels']) {
+                //item marker
+                echo '<div style="flex: 0.5" id ="' . $this->options['item_ids']['marker'] . $loop_count .  '" class="' . $this->options['item_classes']['marker'] . '">';
+                    echo $item['level'] == 0 ? $item['marker'] : '';
                 echo '</div>';
             }
-            // print_r($item);
+            //item
+            echo '<div style="flex: 2" id ="' . $this->options['item_ids']['list_item'] . $loop_count .  '" class="' . $this->options['item_classes']['list_item'] . '">';
+                echo str_repeat($this->options['tab'], $item['level']) . $item['text'];
+            echo '</div>';
+        echo '</div>'; // close per-item container
+
+        $loop_count++;
+    }
+
+    /**
+     * @param $item array
+     */
+    private function handleTitleItem($item, &$loop_count): void
+    {
+        if($item['level'] == 1) {
+            echo '<h2 id ="'.$this->options['item_ids']['title']. $loop_count . '" class="'.$this->options['item_classes']['title'].'">';
+            echo $item['text'];
+            echo '</h2>';
+
+            $loop_count++;
+        }
+
+        if($item['level'] == 2) {
+            if ($this->options['subtitles_as_labels'])
+                return;
+
+            echo '<h3 id ="'.$this->options['item_ids']['title']. $loop_count . '" class="'.$this->options['item_classes']['title'].'">';
+                echo $item['text'];
+            echo '</h2>';
+
+            $loop_count++;
         }
     }
 }
